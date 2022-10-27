@@ -1,0 +1,152 @@
+# general settings
+name: SR_Hyperfine
+
+model_type: ESRGANModel
+scale: 4
+num_gpu: 1  # set num_gpu: 0 for cpu mode
+manual_seed: 0
+
+# dataset and data loader settings
+datasets:
+  train:
+    name: DIV2K
+    type: PairedImageDataset
+    dataroot_gt: /autofs/cluster/HyperfineSR/sonia/data/3D/train/T1/HCP_1mm # High resolution HCP data, used as target and is degraded for paired training
+    dataroot_lq: /autofs/cluster/HyperfineSR/sonia/data/3D/train/T1/Hyperfine # Clinical Low-Field data, only used in the final finetunning
+    dataroot_seg: /autofs/cluster/HyperfineSR/sonia/data/3D/train/T1/HCP_seg1mm/ # Directory of the segmentations, regarding dataroot_gt
+    dataugm: True # Recommeded using data augmentation
+    T: T1
+    cycle: True
+    cut: False
+    denois: False
+    model_sr: SR_trainedwithnoise_3D_orig # Pretrained model to load, super resolution trained on clean data
+    epoch_sr: net_g_26000.pth
+    model_d: 1mm_noclip_128_crop_5layers_1e3 # Pretrained model to load, denoiser module
+    epoch_d: model_epoch_400.pth
+    model_srd: SR_nonoise_3D_orig_1e3GANlr1e5_denois_new # Pretrained model to load, combination of denoiser + super resolution
+    epoch_srd: net_g_26000.pth
+    model_daf: FastCUT_T1_3D_3280_newbias_real # Pretrained model to load, coming from domain adaptation FastCUT
+    epoch_daf: 175_net_G.pth
+    model_da: cycleGAN_T1_3D_crop3280 # Pretrained model to load, coming from domain adaptation CycleGAN
+    epoch_da: 595_net_G_A.pth
+    filename_tmpl: '{}'
+    io_backend:
+      type: disk
+
+    gt_size: 130 #patch size
+    use_flip: true
+    use_rot: false
+
+    # data loader
+    use_shuffle: true
+    num_worker_per_gpu: 6
+    batch_size_per_gpu: 1
+    dataset_enlarge_ratio: 100
+    prefetch_mode: ~
+
+  val:
+    name: Set14
+    type: PairedImageDataset
+    dataroot_gt: /autofs/cluster/HyperfineSR/sonia/data/3D/train/T1/HCP_1mm # High resolution HCP data, used as target and is degraded for paired training
+    dataroot_lq: /autofs/cluster/HyperfineSR/sonia/data/3D/test/T1/Hyperfine # Clinical Low-Field data, only used in the final finetunning
+    dataroot_seg: /autofs/cluster/HyperfineSR/sonia/data/3D/train/T1/HCP_seg1mm_new/ # Directory of the segmentations, regarding dataroot_gt
+
+
+    io_backend:
+      type: disk
+
+# network structures
+network_g:
+  type: RRDBNet
+  num_in_ch: 1
+  num_out_ch: 1
+  num_feat: 64
+  num_block: 23
+
+network_d:
+  type: VGGStyleDiscriminator128
+  num_in_ch: 1
+  num_feat: 64
+
+network_d_2:
+  type: VGGStyleDiscriminator128_2
+  num_in_ch: 1
+  num_feat: 64
+
+# path
+path:
+  pretrain_network_g: ~
+  strict_load_g: auto
+  resume_state: ~
+
+# training settings
+train:
+  ema_decay: 0.999
+  optim_g:
+    type: Adam
+    lr: !!float 1e-4
+    weight_decay: 0
+    betas: [0.9, 0.99]
+  optim_d:
+    type: Adam
+    lr: !!float 1e-4
+    weight_decay: 0
+    betas: [0.9, 0.99]
+
+  scheduler:
+    type: MultiStepLR
+    milestones: [50000, 100000, 200000, 300000]
+    gamma: 0.5
+
+  total_iter: 50000 #initial total was 800000
+  warmup_iter: -1  # no warm up
+
+  # losses
+  pixel_opt:
+    type: L1Loss
+    loss_weight: 1
+    reduction: mean
+  perceptual_opt: # Not being used i this implementation because we are working with 3D data
+    type: PerceptualLoss
+    layer_weights:
+      'conv5_4': 1  # before relu
+    vgg_type: vgg19
+    use_input_norm: true
+    range_norm: false
+    perceptual_weight: 1.0
+    style_weight: 0
+    criterion: l1
+  gan_opt:
+    type: GANLoss
+    gan_type: vanilla
+    real_label_val: 1.0
+    fake_label_val: 0.0
+    loss_weight: !!float 1e-3
+
+  net_d_iters: 1 #Orig is 1
+  net_d_init_iters: 0 #Orig is 0
+
+# validation settings
+val:
+  val_freq: !!float 5e3
+  save_img: false
+
+  metrics:
+    psnr: # metric name, can be arbitrary
+      type: calculate_psnr
+      crop_border: 4
+      test_y_channel: false
+
+# logging settings
+logger:
+  print_freq: 100
+  save_checkpoint_freq: !!float 2
+  use_tb_logger: true
+  wandb:
+    project: ~
+    resume_id: ~
+
+# dist training settings
+dist_params:
+  backend: nccl
+  port: 29500
