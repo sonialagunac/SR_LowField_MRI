@@ -33,7 +33,7 @@ This meta-architecture is divided in modules that are trained on different data-
 ### 2. Train Super Resolution meta-architecture.
 To train the network, one needs to train module by module in the steps described below. An example of a model at each step can be found in the directory `model_example`.
 
-####Step 1
+#### Step 1
 
 - `Denoiser`: 
 To train the network, specify the data paths `train_dir` and `seg_dir` in the file `/denoising_3D/train.py`. These correspond to the directories with the HCP data and its segmentation. Finally, the name of the experiment can be defined in `out_path`. Run `./denoising_3D/train.py` to train this module. 
@@ -49,10 +49,10 @@ To test it, run `python test.py  --dataroot /directory/to/data_folder  --name  n
   - CycleGAN: To train the network, inside of the directory `pytorch-CycleGAN-and-pix2pix-master_3D`, run `python train.py --dataroot /directory/to/data_folder --name define_name  --model cycle_gan   --input_nc 1 --output_nc 1 --batch_size 1   --num_threads 8  --netG resnet_6blocks  --norm batch  --no_flip --display_port 10003`. To test it, run `python test.py --dataroot /directory/to/data_folder --name  name_of_model_toinference --model cycle_gan  --input_nc 1 --output_nc  1  --num_threads 8 --norm  batch --netG resnet_6blocks  --num_test 100000000  --epoch num_desired_epochs`. See [README](./pytorch-CycleGAN-and-pix2pix-master_3D/README.md) for further details on this implementaiton. 
 
 Note that, after this point, the remaining neural network methodology will be done using the `BasicSR-master_3D` directory only. 
-####Step 2
+#### Step 2
 - `Denoiser + Super-Resolution`: This part requires to load the denoiser and super-resolution models trained on Step 1 and retraining them in a concatenated fashion. To train this new combination the user needs to modify the options .yaml [file](./BasicSR-master_3D/options/train/ESRGAN/train_ESRGAN_x4_sonia.yml) from the `BasicSR-master_3D`directory. In such file, specific parameters need to be set: `datasets/(test_1/train)/denois` will be set to True, `datasets/train/model_sr` includes the name of the pretrained model of super-resolution in Step 1, `datasets/train/epoch_sr` includes the number of the epoch corresponding to `model_sr`,  `datasets/train/model_d` with the name of the pretrained model of denoising in step 1 with the corresponding `epoch_d`. Once the options file is set, run `python ./basicsr/train.py -opt ./options/train/ESRGAN/name_of_train_config.yml` to train this module and run `python ./basicsr/test.py -opt ./options/test/ESRGAN/name_of_test_config.yml` to test it, with `denois` as True in the testing config file too.    
 
-####Step 3
+#### Step 3
 - Final end-to-end finetuning, `Domain adaptation + Denoiser + Super-Resolution`: This part requires to load the denoiser and super-resolution concatenated model from step 2 and the domain adaptation models from Step 1 to train them together in a concatenated fashion.  To train this new combination the user needs to modify the options .yaml [file](./BasicSR-master_3D/options/train/ESRGAN/train_ESRGAN_x4_sonia.yml) from the `BasicSR-master_3D`directory. In such file, specific parameters need to be set: `datasets/(test_1/train)/denois` will be set to False, `datasets/(test_1/train)/cycle` will be set to True if working with the CycleGAN and `datasets/(test_1/train)/cut` will be set to True if working with FastCUt, `datasets/train/model_dsr` needs to include the name of the pretrained model of super-resolution and denoising in Step 2, `datasets/train/epoch_dsr` includes the number of the epoch corresponding to `model_dsr`,  `datasets/train/(model_da/model_daf)` with the name of the pretrained model of domain adapatation for CycleGAN/FastCUT in step 1 with the corresponding `epoch_da/epoch_daf`. Finally, we are using the parameter `datasets/train/dataroot_lq` for the first time, it includes the low-field MRI data for unpaired learning. Once the config file is set, run `python ./basicsr/train.py -opt ./options/train/ESRGAN/name_of_train_config.yml` to train this module and run `python ./basicsr/test.py -opt ./options/test/ESRGAN/name_of_test_config.yml` to test it, with `denois` as False and `cycle/cut` as True in the testing config file too.    
 
 ### 3. Evaluate the trained model. 
