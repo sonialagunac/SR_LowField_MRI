@@ -9,7 +9,7 @@ An example of the results of our method can be seen below.
 ![plot](./Figure_vols.jpg)
 ---
 The steps to apply our method are described below:
-###0. Installation: Environment setup prior to experiments
+### 0. Installation: Environment setup prior to experiments
 1. Clone this repository
 2. Create a virtual environment, and install the required packages (see [requirements](requirements_SR.txt)). Run  `pip install -r requirements.txt`
 
